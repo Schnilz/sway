@@ -754,7 +754,8 @@ static struct cmd_results *cmd_move_in_direction(
 }
 
 static const char expected_position_syntax[] =
-	"Expected 'move [absolute] position <x> [px] <y> [px]' or "
+	"Expected 'move absolute position <x> [px] <y> [px]' or "
+	"Expected 'move position <x> [px|ppt] <y> [px|ppt]' or "
 	"'move [absolute] position center' or "
 	"'move position cursor|mouse|pointer'";
 
@@ -822,11 +823,15 @@ static struct cmd_results *cmd_move_to_position(int argc, char **argv) {
 
 	double lx, ly;
 	char *inv;
+	bool ppt_x = false;
+	bool ppt_y = false;
 	lx = (double)strtol(argv[0], &inv, 10);
-	if (*inv != '\0' && strcasecmp(inv, "px") != 0) {
-		return cmd_results_new(CMD_FAILURE, "Invalid position specified");
+	if ((*inv != '\0') && !parse_unit(inv,&ppt_x)) {
+		return cmd_results_new(CMD_FAILURE,
+			"Invalid position specified");
 	}
-	if (strcmp(argv[1], "px") == 0) {
+
+	if (parse_unit(argv[1],&ppt_x)) {
 		--argc;
 		++argv;
 	}
@@ -836,9 +841,10 @@ static struct cmd_results *cmd_move_to_position(int argc, char **argv) {
 	}
 
 	ly = (double)strtol(argv[1], &inv, 10);
-	if ((*inv != '\0' && strcasecmp(inv, "px") != 0) ||
-			(argc == 3 && strcmp(argv[2], "px") != 0)) {
-		return cmd_results_new(CMD_FAILURE, "Invalid position specified");
+	if (((*inv != '\0') && !parse_unit(inv,&ppt_y))
+			|| ((argc == 3) && !parse_unit(argv[2],&ppt_y))) {
+		return cmd_results_new(CMD_FAILURE,
+			"Invalid position specified");
 	}
 
 	if (!absolute) {
@@ -847,8 +853,19 @@ static struct cmd_results *cmd_move_to_position(int argc, char **argv) {
 			struct sway_seat *seat = config->handler_context.seat;
 			ws = seat_get_focused_workspace(seat);
 		}
-		lx += ws->x;
-		ly += ws->y;
+		if (!ppt_x) {
+			lx += ws->x;
+		} else {
+			lx = ws->x + lx / 100.0 * ws->width;
+		}
+		if (!ppt_y) {
+			ly += ws->y;
+		} else {
+			ly = ws->y + ly / 100.0 * ws->height;
+		}
+	} else if (ppt_x || ppt_y) {
+		return cmd_results_new(CMD_FAILURE,
+			"absolute position can not be used with ppt unit");
 	}
 	container_floating_move_to(container, lx, ly);
 	return cmd_results_new(CMD_SUCCESS, NULL);

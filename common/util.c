@@ -71,6 +71,16 @@ float parse_float(const char *value) {
 	return flt;
 }
 
+bool parse_unit(const char *str, bool *ppt) {
+	if (strcmp(str, "px") == 0) {
+		if (ppt) *ppt = false;
+	} else if (strcmp(str, "ppt") == 0) {
+		if (ppt) *ppt = true;
+	} else {
+		return false;
+	}
+	return true;
+}
 
 const char *sway_wl_output_subpixel_to_string(enum wl_output_subpixel subpixel) {
 	switch (subpixel) {
